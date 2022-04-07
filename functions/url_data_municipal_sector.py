@@ -1,84 +1,166 @@
 # Libraries
 # ==============================================================================
-from attr import attr
-import pandas as pd
+import numpy as np
 import requests
 import urllib
 from bs4 import BeautifulSoup
 
+class UrlDataSMCRG():
 
-def url_data_sm_cgr(year_start, year_end, report = 'all'):
+    def __init__(self, year_start, year_end, report = 'all'):
+        self.year_start = year_start
+        self.year_end = year_end
+        self.report = report
 
-    """
-    
-    """
+        selected_years = self.selected_years()
+        years_reports = self.years_reports()
 
-    # Validation args year_start and year_end
-    if type(year_start) != int or type(year_end) != int:
+        # Validation args year_start and year_end
+        if type(year_start) != int or type(year_end) != int:
 
-        raise TypeError('year_start and year_end must be of type int')
+            raise TypeError(
+                'year_start and year_end must be of type int'
+                )
 
-    # Validation arg report
-    if type(report) != str:
+        # Validation args year_end greater than or equal year_start
+        if year_end < year_start:
+            
+            raise ValueError(
+                'Argument year_end must be greater than or equal to year_start'
+                )
 
-        raise TypeError('report argument must be format string')
+        # Validation args range year selected
+        for sy in selected_years:
+            if sy not in years_reports:
 
-    elif report not in ('all', 'budget', 'equity'):
+                raise ValueError(
+                    f"""
+                    Years selected {sy} outside the allowed range, the financial reports 
+                    to be downloaded comprise the following years {min(years_reports)} and {max(years_reports)}
+                    """
+                )
+                
+        # Validation arg report
+        if type(report) != str:
 
-        raise ValueError('Report only allows the following parameters: all, budget or equity')
+            raise TypeError(
+                'report argument must be format string'
+                )
 
-    # URL
-    url = 'https://www.contraloria.cl/web/cgr/base-de-datos-municipales'
+        elif report not in ('all', 'budget', 'equity'):
 
-    # GET-Request
-    try:
-        print(f'Generating connection to: {url}')
-        response = requests.get(url)
-    
-    except urllib.error.HTTPError as http:
-        print('\nHTTP error: ' + http)
+            raise ValueError(
+                'Report only allows the following parameters: all, budget or equity'
+                )
 
-    except urllib.error.URLError as ue:
-        print('\nThe server is not operational, please try again later')
-    
-    else:
-        print(f'\nSuccessful connection')
+    @property
+    def url(self):
 
-    # Soup
-    soup = BeautifulSoup(response.text, 'html.parser')
+        # Url CGR financial report municipal sector
+        url = 'https://www.contraloria.cl/web/cgr/base-de-datos-municipales'
 
-    # Results with all the href of the url
-    result = soup.find_all('a', href = True)
+        return url
 
-    # Url lists for reports budget and equity
-    url_budget = []
-    url_equity = []
+    def response_url(self):
 
-    # url cgr
-    url_cgr = 'https://www.contraloria.cl'
+        # GET-Request
+        try:
+            print(f'Generating connection to: {self.url}')
+            response = requests.get(self.url)
+        
+        except urllib.error.HTTPError as http:
+            print('\nHTTP error: ' + http)
 
-    # extract url budget and equity
-    for u in result:
-        href = u.get('href')
+        except urllib.error.URLError as ue:
+            print('\nThe server is not operational, please try again later')
+        
+        else:
+            print(f'\nSuccessful connection')
 
-        if 'Presupuestaria' in href:
-            url_budget.append(f'{url_cgr}{href}')
+        return response
 
-        elif 'Patrimonial' in href:
-            url_equity.append(f'{url_cgr}{href}')
+    def soup(self):
 
-    if response == 'budget':
-        return url_budget
+        # Soup
+        soup = BeautifulSoup(
+            self.response_url().text, 
+            'html.parser'
+        )
 
-    elif response == 'equity':
-        return url_equity
+        return soup
 
-    else:
-        return (url_budget, url_equity)
+    def years_reports(self):
 
+        results = self.soup()
+        results = results.find_all(
+            'a', 
+            class_ = 'tablinks'
+        )
+        
+        years = []
 
-url_data_sm_cgr(
-    year_end = 2021,
-    year_start = 2021,
-    report = "budget"
+        for result in results:
+
+            years.append(result.get_text())
+
+        years = sorted(list(map(int, years)))
+
+        return years
+
+    def selected_years(self):
+
+        select = np.arange(
+            self.year_start, 
+            self.year_end + 1
+        ).tolist()
+
+        return select
+
+    def url_data(self):
+        
+        results = self.soup()
+        results = results.find_all(
+            'div', 
+            class_ = 'tabcontent', 
+            id = self.selected_years()
+        )
+
+        # Url lists for reports budget and equity
+        url_budget = []
+        url_equity = []
+
+        # Url cgr
+        url_cgr = 'https://www.contraloria.cl'    
+
+        # Extract url budget and equity
+        for result in results:
+            href = result.find_all('a', href = True)
+
+            for hr in href:
+                url = hr.get('href')
+
+                if 'Presupuestaria' in url:
+                    url_budget.append(f'{url_cgr}{url}')
+
+                elif 'Patrimonial' in url:
+                    url_equity.append(f'{url_cgr}{url}')
+
+        # Return url
+        if self.report == 'budget':
+            return url_budget
+
+        elif self.report == 'equity':
+            return url_equity
+
+        else:
+            return (url_budget, url_equity)
+
+CGR = UrlDataSMCRG(
+    year_start = 2015,
+    year_end = 2022,
+    report = 'budget'
 )
+
+CGR.response_url()
+CGR.url
+CGR.url_data()
