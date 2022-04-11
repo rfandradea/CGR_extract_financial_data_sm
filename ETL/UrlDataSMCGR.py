@@ -71,12 +71,12 @@ class UrlDataSMCGR():
 
         return url
 
-    def response_url(self):
+    def response_url(self, url):
 
         # GET-Request
         try:
-            print(f'Generating connection to: {self.url_bd_sm}')
-            response = requests.get(self.url_bd_sm)
+            print(f'Generating connection to: {url}')
+            response = requests.get(url)
         
         except urllib.error.HTTPError as http:
             print('\nHTTP error: ' + http)
@@ -85,7 +85,7 @@ class UrlDataSMCGR():
             print('\nThe server is not operational, please try again later')
         
         else:
-            print(f'\nSuccessful connection')
+            print(f'\nSuccessful connection\n')
 
         return response
 
@@ -93,7 +93,7 @@ class UrlDataSMCGR():
 
         # Soup
         soup = BeautifulSoup(
-            self.response_url().text, 
+            self.response_url(self.url_bd_sm).text, 
             'html.parser'
         )
 
