@@ -3,19 +3,13 @@
 import pandas as pd
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-import UrlDataSMCGR as UrlCGR
+from UrlDataSMCGR import UrlDataSMCGR
 
-Url_CGR = UrlCGR.UrlDataSMCGR(
-    year_start = 2020,
-    year_end = 2021
-)
+class ExtractDataSMCGR(UrlDataSMCGR):
 
-url_data = Url_CGR.url_data()
-
-class ExtractDataSMCGR():
-
-    def __init__(self, url_data):
-        self.url_data = url_data
+    def __init__(self, year_start, year_end, report = 'all'):
+        
+        UrlDataSMCGR.__init__(self, year_start, year_end, report)
 
     @property
     def months(self):
@@ -55,27 +49,87 @@ class ExtractDataSMCGR():
 
     def data_raw_budget(self):
 
-        url = self.url_data
+        url = super().url_data()
         url = url['budget']
 
         data = pd.DataFrame()
 
-        for u in url:
-            data_temp = pd.read_excel(
-                u, 
-                dtype = str
-            )
+        for u, y in zip(url, sorted(super().selected_years())):
 
-            data = pd.concat(
-                [data, data_temp],
-                axis = 0
-            )
+            print(f'\nDownloading budget data year {y}')
+
+            try:
+                super().response_url(u)      
+
+                data_temp = pd.read_excel(
+                    u, 
+                    dtype = str
+                )
+
+                print(
+                    f"""
+                    The downloaded equity raw data for the year {y} 
+                    contains {data_temp.shape[0]} rows and {data_temp.shape[1]} columns\n
+                    """
+                )
+
+                data = pd.concat(
+                    [data, data_temp],
+                    axis = 0
+                )
+            
+            except Exception:
+
+                print(f'\nAn error occurred when downloading the data for the year {y}\n')
+
+                pass
+
+        print(
+            f"""
+            A total of {data.shape[0]} rows and {data_temp.shape[1]} columns have 
+            been downloaded for budget raw data\n
+            """ 
+        )
+
+        return data
+
+    def data_raw_equitiy(self):
+
+        url = super().url_data()
+        url = url['equity']
+
+        data = pd.DataFrame()
+
+        for u, y in zip(url, sorted(super().selected_years())):
+
+            print(f'\nDownloading equity raw data year {y}\n')
+
+            try:
+                super().response_url(u)      
+
+                data_temp = pd.read_excel(
+                    u, 
+                    dtype = str
+                )
+
+                data = pd.concat(
+                    [data, data_temp],
+                    axis = 0
+                )
+            
+            except Exception:
+
+                print(f'An error occurred when downloading the data for the year {y}\n')
+
+                pass
 
         return data
 
     def data_budget(self):
 
         data = self.data_raw_budget()
+
+        print('\nInitiating processing of raw budget data\n')
 
         data.columns = ['_'.join(c.upper().split(' ')) for c in data.columns]
 
@@ -94,7 +148,9 @@ class ExtractDataSMCGR():
             expand = True
         )
 
-        columns[0].replace(
+        columns.columns = ['CONCEPTO', 'MES_EJERCICIO']
+
+        columns['CONCEPTO'].replace(
             {
                 'PPTO' : 'PPTO_INICIAL',
                 'PERCIBIDOPAG' : 'PERCIBIDO_PAG'
@@ -102,12 +158,10 @@ class ExtractDataSMCGR():
             inplace = True
         )
 
-        columns[1].replace(
+        columns['MES_EJERCICIO'].replace(
             self.months,
             inplace = True
         )
-
-        columns.columns = ['CONCEPTO', 'MES_EJERCICIO']
 
         data.drop(
             columns = ['CONCEPTO'],
@@ -164,10 +218,14 @@ class ExtractDataSMCGR():
 
         data.loc[:, int_columns] = data.loc[:, int_columns].astype('Int64')
 
+        print('Budget data processing completed')
+
         return data
 
 extract = ExtractDataSMCGR(
-    url_data = url_data
+    year_start = 2021,
+    year_end = 2021,
+    report = 'all'
 )
 
 data = extract.data_budget()
